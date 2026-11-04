@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Database Skripsi Alumni — Sarjana Arkeologi Unhas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--red:#b30000;--navy:#0f1a5c;--ink:#1c2233;--mut:#5b6478;--line:#dde1ea;--bg:#f5f6fa}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 Inter,system-ui,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+.w{max-width:1200px;margin:0 auto;padding:0 16px}
+header{background:var(--red);color:#fff;padding:28px 0 64px}
+h1{margin:0 0 4px;font-size:clamp(1.4rem,3vw,2rem);font-weight:800;line-height:1.2}
+header p{margin:0;opacity:.92}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;margin-top:-40px;box-shadow:0 2px 12px rgba(15,26,92,.1)}
+#q{width:100%;padding:13px 14px;font:inherit;font-size:1.05rem;border:2px solid var(--navy);border-radius:8px}
+#filters{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:14px}
+label{display:block;font-size:.8rem;font-weight:600;color:var(--mut)}
+select{width:100%;margin-top:3px;padding:8px;font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:6px}
+.bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between;margin-top:14px}
+.bar label{min-width:180px}
+button{font:inherit;font-weight:600;padding:8px 16px;color:var(--navy);background:#fff;border:1.5px solid var(--navy);border-radius:6px;cursor:pointer}
+button:hover:not(:disabled){background:var(--navy);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid #f2a900;outline-offset:2px}
+#info{margin:18px 0 8px;color:var(--mut);font-size:.9rem}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line)}
+th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-size:.85rem}
+td{padding:11px 12px;border-top:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#fafbfd}
+.m{color:var(--mut);font-size:.85rem}
+details{margin-top:6px}summary{cursor:pointer;color:var(--navy);font-weight:600;font-size:.85rem}details p{margin:6px 0 0;white-space:pre-line;font-size:.9rem}
+#empty{padding:32px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:8px}
+#pg{display:flex;gap:14px;align-items:center;justify-content:center;margin:18px 0}
+footer{padding:8px 0 32px;color:var(--mut);font-size:.85rem}
+@media(max-width:760px){
+ thead{display:none}
+ table,tbody,tr,td{display:block}
+ tr{margin-bottom:12px;border:1px solid var(--line);border-radius:8px;background:#fff;overflow:hidden}
+ td{border-top:0;padding:8px 12px}
+ td::before{content:attr(data-l);display:block;font-size:.75rem;font-weight:600;color:var(--mut)}
+}
+</style>
+</head>
+<body>
+<header><div class="w">
+ <h1>Database Skripsi Alumni</h1>
+ <p>Program Studi Sarjana Arkeologi, Universitas Hasanuddin</p>
+</div></header>
+
+<main class="w">
+ <section class="panel">
+  <input id="q" type="search" placeholder="Cari nama, judul, atau abstrak" aria-label="Cari nama, judul, atau abstrak" autocomplete="off">
+  <div id="filters"></div>
+  <div class="bar">
+   <label>Urutkan
+    <select id="urut">
+     <option value="baru">Tahun terbit terbaru</option>
+     <option value="lama">Tahun terbit terlama</option>
+     <option value="nama">Nama A–Z</option>
+     <option value="angkatan">Angkatan</option>
+    </select>
+   </label>
+   <button id="reset" type="button">Atur ulang</button>
+  </div>
+ </section>
+
+ <p id="info" aria-live="polite"></p>
+ <table id="tbl" hidden>
+  <thead><tr><th>Alumni</th><th>Judul skripsi</th><th>Kajian</th><th>Lokasi</th><th>Ketersediaan</th></tr></thead>
+  <tbody id="body"></tbody>
+ </table>
+ <div id="empty" hidden>Tidak ada skripsi yang cocok. Ubah kata kunci atau klik Atur ulang.</div>
+ <div id="pg"></div>
+</main>
+
+<footer><div class="w">
+ Program Studi Sarjana Arkeologi, Fakultas Ilmu Budaya, Universitas Hasanuddin.
+ <span id="upd"></span>
+</div></footer>
+
+<script src="data.js"></script>
+<script>
+(function(){
+const F=[['angkatan','Angkatan'],['tahun','Tahun terbit'],['prov','Provinsi'],['kab','Kabupaten/Kota'],['kec','Kecamatan'],['situs','Situs'],['tema','Tema kajian'],['objek','Objek kajian']];
+const MULTI={objek:1,situs:1,kec:1,kab:1,prov:1};
+const $=id=>document.getElementById(id);
+const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const D=(window.DATA||[]).map(r=>{
+ r._v={};
+ F.forEach(([k])=>{const x=r[k];r._v[k]=MULTI[k]?String(x||'').split(';').map(s=>s.trim()).filter(Boolean):(x===undefined||x===null||x===''?[]:[String(x).trim()])});
+ r._q=((r.nama||'')+' '+(r.judul||'')+' '+(r.abstrak||'')).toLowerCase();
+ return r;
+});
+const PER=20;let page=1;
+$('filters').innerHTML=F.map(([k,l])=>`<label>${l}<select id="f_${k}"></select></label>`).join('');
+if(window.DATA_UPDATED)$('upd').textContent='Data diperbarui: '+window.DATA_UPDATED+'.';
+
+const match=(r,skip)=>{
+ const q=$('q').value.trim().toLowerCase();
+ if(q&&!q.split(/\s+/).every(w=>r._q.includes(w)))return false;
+ return F.every(([k])=>{if(k===skip)return true;const v=$('f_'+k).value;return !v||r._v[k].includes(v)});
+};
+function opts(){
+ F.forEach(([k])=>{
+  const s=$('f_'+k),cur=s.value,set=new Set();
+  D.forEach(r=>{if(match(r,k))r._v[k].forEach(v=>set.add(v))});
+  const a=[...set],num=a.every(v=>/^\d+$/.test(v));
+  a.sort((x,y)=>num?(k==='tahun'?y-x:x-y):x.localeCompare(y,'id'));
+  s.innerHTML='<option value="">Semua</option>'+a.map(v=>`<option${v===cur?' selected':''}>${e(v)}</option>`).join('');
+ });
+}
+const row=r=>{
+ const ln=a=>a.filter(Boolean).map(e).join('<br>');
+ const lb=(t,v)=>v?t+': '+v:'';
+ const dos=[lb('Hard file',r.hard),lb('Soft file',r.soft)];
+ return `<tr><td data-l="Alumni"><b>${e(r.nama)}</b><br><span class="m">Angkatan ${e(r.angkatan)}</span></td>`+
+ `<td data-l="Judul skripsi">${e(r.judul)}<br><span class="m">Terbit ${e(r.tahun)}</span>${r.abstrak?`<details><summary>Abstrak</summary><p>${e(r.abstrak)}</p></details>`:''}</td>`+
+ `<td data-l="Kajian">${ln([r.tema,r.sub,r.objek])}</td>`+
+ `<td data-l="Lokasi">${ln([lb('Situs',r.situs),lb('Kecamatan',r.kec),lb('Kabupaten',r.kab),lb('Provinsi',r.prov)])}</td>`+
+ `<td data-l="Ketersediaan">${ln(dos)}</td></tr>`;
+};
+function render(){
+ const u=$('urut').value,nm=(x,y)=>String(x.nama).localeCompare(y.nama,'id');
+ const t=(x,y)=>(+y.tahun||0)-(+x.tahun||0);
+ const a=D.filter(r=>match(r));
+ a.sort(u==='lama'?(x,y)=>-t(x,y)||nm(x,y):u==='nama'?nm:u==='angkatan'?(x,y)=>(+x.angkatan||0)-(+y.angkatan||0)||nm(x,y):(x,y)=>t(x,y)||nm(x,y));
+ const n=a.length,pages=Math.max(1,Math.ceil(n/PER));
+ page=Math.min(page,pages);
+ $('info').textContent=n?`Menampilkan ${(page-1)*PER+1}–${Math.min(page*PER,n)} dari ${n} skripsi`:'';
+ $('body').innerHTML=a.slice((page-1)*PER,page*PER).map(row).join('');
+ $('tbl').hidden=!n;$('empty').hidden=n>0;
+ $('pg').innerHTML=pages>1?`<button ${page<2?'disabled':''} data-p="${page-1}">Sebelumnya</button><span>Halaman ${page} dari ${pages}</span><button ${page>=pages?'disabled':''} data-p="${page+1}">Berikutnya</button>`:'';
+}
+const update=()=>{page=1;opts();render()};
+$('q').addEventListener('input',update);
+$('filters').addEventListener('change',update);
+$('urut').addEventListener('change',render);
+$('reset').addEventListener('click',()=>{$('q').value='';F.forEach(([k])=>$('f_'+k).value='');update()});
+$('pg').addEventListener('click',ev=>{const p=ev.target.dataset.p;if(p){page=+p;render();$('info').scrollIntoView({behavior:'smooth'})}});
+if(!D.length)$('empty').textContent='Data belum dimuat. Pastikan file data.js berada di folder yang sama dengan index.html.';
+update();
+})();
+</script>
+</body>
+</html>
